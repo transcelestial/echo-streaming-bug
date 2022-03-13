@@ -4,6 +4,7 @@ There seems to be some packet loss when using streaming responses in [echo](http
 I have tested in the following envs/contexts:
 1. Run the server, proxy and client on a macOS 11.6.2 M1, Go 1.16.4 and Chrome 98.0
 2. Run the server and proxy (cross-compiled for Linux w/ Go 1.16.4) on a Raspberry Pi 3 (CM3+), Debian 9, Linux 4.14.98 and the client on a macOS 11.6.2 M1 and Chrome 98.0 (ssh and proxy the proxy port to the local macOS machine)
+3. Run same as 1, but multiple clients (Go + browser) connected
 
 Notes:
 1. When running everything on the same host, it takes much longer to get the error
@@ -59,7 +60,7 @@ async function streamData(url) {
 streamData("https://localhost:9000/api/ping?interval=100ms")
 ```
 
-You should see (in the browser debugger) - after some time ():
+You should see (in the browser debugger) - after some time (30 mins or more):
 ```
 SyntaxError: Unexpected token { in JSON at position 119
     at streamData (<anonymous>:20:40)
