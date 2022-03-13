@@ -2,13 +2,14 @@
 There seems to be some packet loss when using streaming responses in [echo](https://echo.labstack.com/), and when proxied through another echo server using the [proxy middleware](https://echo.labstack.com/middleware/proxy/).
 
 I have tested in the following envs/contexts:
-1. Run the server, proxy and client on a macOS 11.6.2 M1, Go 1.16.4 and Chrome 98.0
-2. Run the server and proxy (cross-compiled for Linux w/ Go 1.16.4) on a Raspberry Pi 3 (CM3+), Debian 9, Linux 4.14.98 and the client on a macOS 11.6.2 M1 and Chrome 98.0 (ssh and proxy the proxy port to the local macOS machine)
-3. Run same as 1, but multiple clients (Go + browser) connected
+1. Run the server and proxy on a macOS 11.6.2 M1, with Go 1.16.4 and the client is Chrome 98.0/Firefox 97.0/Edge 99.0/Safari 15.2 (on the same macOS)
+2. Run the server and proxy (cross-compiled for Linux, ARM, w/ Go 1.16.4) on a Raspberry Pi 3 (CM3+), Debian 9, Linux 4.14.98 and the client is the same as above (SSH and proxy - with `ssh -L 9000:127.0.0.1:9000 <host IP>` - the proxy server port to the local macOS machine)
+3. Run same as 1, but multiple clients (Go CLI + browsers) connected
 
 Notes:
 1. When running everything on the same host, it takes much longer to get the error
 2. When running the proxy and server remotely, it fails earlier, but still takes quite some time
+3. Firefox fails much earlier (7 minutes on average) - it also seems like whenever I clear the console a few times, it makes the request fail with, but with a different error
 
 ## Reproduce
 To reproduce the issue:
@@ -66,7 +67,12 @@ SyntaxError: Unexpected token { in JSON at position 119
     at streamData (<anonymous>:20:40)
 ```
 
-Note: I was unable to reproduce the error when running the Go [client](./cmd/client/). I ran it for about 2hrs and the error didn't occur.
+In Firefox, when clearing the console, you get:
+```
+SyntaxError: JSON.parse: unexpected non-whitespace character after JSON data at line 2 column 1 of the JSON data
+```
+
+**NOTE**: I was unable to reproduce the error when running the Go [client](./cmd/client/). I ran it for about 2hrs and the error didn't occur.
 
 ## Guides
 Generate a self-signed SSL cert/key pair with (see [SO](https://stackoverflow.com/a/10176685/1092007)):
