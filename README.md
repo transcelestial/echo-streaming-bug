@@ -1,27 +1,25 @@
 # echo-streaming-bug
+There seems to be some packet loss when using streaming responses in [echo](https://echo.labstack.com/), and when proxied through another echo server using the [proxy middleware](https://echo.labstack.com/middleware/proxy/).
+
+I have tested in the following envs/contexts:
+1. Run the server, proxy and client on a macOS 11.6.2 M1, Go 1.16.4 and Chrome 98.0
+2. Run the server and proxy (cross-compiled for Linux w/ Go 1.16.4) on a Raspberry Pi 3 (CM3+), Debian 9, Linux 4.14.98 and the client on a macOS 11.6.2 M1 and Chrome 98.0 (ssh and proxy the proxy port to the local macOS machine)
+
+Notes:
+1. When running everything on the same host, it takes much longer to get the error
+2. When running the proxy and server remotely, it fails earlier, but still takes quite some time
 
 ## Reproduce
 To reproduce the issue:
-1. Setup 2 WireGuard peers (see [quickstart](https://www.wireguard.com/quickstart/)) - your dev machine and some other machine (should be Linux)
-2. Build the 2 binaries ([server](./cmd/server/) and [proxy](./cmd/proxy/))
+1. Run the server:
 ```bash
-GO111MODULE=on GOARCH=arm GOOS=linux go build -o server ./cmd/server/.
-GO111MODULE=on GOARCH=arm GOOS=linux go build -o proxy ./cmd/proxy/.
+go run ./cmd/server/main.go -cert ./certs/cert.pem -key ./certs/key.pem
 ```
-3. Copy the 2 binaries and [certs](./certs/) on the other peer
-4. SSH into the peer and proxy the 9000 port
+2. Run the proxy:
 ```bash
-ssh -L 9000:127.0.0.1:9000 <peer>
+go run ./cmd/proxy/main.go -cert ./certs/cert.pem -key ./certs/key.pem
 ```
-5. Start the server:
-```bash
-./server -cert cert.pem -key key.pem
-```
-6. Start the proxy:
-```bash
-./proxy -cert cert.pem -key key.pem
-```
-7.  Open https://localhost:9000 and run the following in the debugger console:
+3. Open https://localhost:9000 and run the following in the debugger console:
 ```js
 async function streamData(url) {
     const res = await fetch(url);
@@ -31,6 +29,7 @@ async function streamData(url) {
     }
     
     const reader = res.body.getReader();
+    const t0 = window.performance.now();
 
     while (true) {
         try {
@@ -45,7 +44,9 @@ async function streamData(url) {
                 const data = await res.json();
                 console.log(data);
             } catch (e) {
+                const t1 = window.performance.now();
                 console.error(e);
+                console.info(`${(t1 - t0)/1000}s`);
                 return;
             }
         } catch (e) {
@@ -57,23 +58,16 @@ async function streamData(url) {
 
 streamData("https://localhost:9000/api/ping?interval=100ms")
 ```
-8. Now wait until you see:
+
+You should see (in the browser debugger) - after some time ():
 ```
 SyntaxError: Unexpected token { in JSON at position 119
     at streamData (<anonymous>:20:40)
 ```
 
+Note: I was unable to reproduce the error when running the Go [client](./cmd/client/). I ran it for about 2hrs and the error didn't occur.
+
 ## Guides
-Run the server:
-```bash
-go run ./cmd/server/main.go -cert ./certs/cert.pem -key ./certs/key.pem
-```
-
-Run the proxy:
-```bash
-go run ./cmd/proxy/main.go -cert ./certs/cert.pem -key ./certs/key.pem
-```
-
 Generate a self-signed SSL cert/key pair with (see [SO](https://stackoverflow.com/a/10176685/1092007)):
 ```bash
 openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -sha256 -days 365 -nodes -subj '/CN=localhost'
