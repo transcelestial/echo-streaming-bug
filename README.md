@@ -6,10 +6,110 @@ I have tested in the following envs/contexts:
 2. Run the server and proxy (cross-compiled for Linux, ARM, w/ Go 1.16.4) on a Raspberry Pi 3 (CM3+), Debian 9, Linux 4.14.98 and the client is the same as above (SSH and proxy - with `ssh -L 9000:127.0.0.1:9000 <host IP>` - the proxy server port to the local macOS machine)
 3. Run same as 1, but multiple clients (Go CLI + browsers) connected
 
-Notes:
+## Notes
 1. When running everything on the same host, it takes much longer to get the error
 2. When running the proxy and server remotely, it fails earlier, but still takes quite some time
-3. Firefox fails much earlier (7 minutes on average) - it also seems like whenever I clear the console a few times, it makes the request fail with, but with a different error
+3. Firefox fails much earlier (15 minutes on average)
+4. Firefox seems to, whenever I clear the console a few times, make the request fail, but with a different error
+
+Chrome headers:
+```
+REQUEST ->
+
+Accept: */*
+Accept-Encoding: gzip, deflate, br
+Accept-Language: en-US,en;q=0.9,da;q=0.8,ro;q=0.7,fr;q=0.6,de;q=0.5
+Referer: https://localhost:9000/
+Sec-Ch-Ua: " Not A;Brand";v="99", "Chromium";v="98", "Google Chrome";v="98"
+Sec-Ch-Ua-Mobile: ?0
+Sec-Ch-Ua-Platform: "macOS"
+Sec-Fetch-Dest: empty
+Sec-Fetch-Mode: cors
+Sec-Fetch-Site: same-origin
+User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.102 Safari/537.36
+
+<- RESPONSE
+
+Content-Encoding: gzip
+Content-Type: application/json
+Date: Sun, 13 Mar 2022 14:04:32 GMT
+Vary: Origin
+Vary: Accept-Encoding
+```
+
+Firefox headers:
+```
+REQUEST ->
+
+Accept: */*
+Accept-Encoding: gzip, deflate, br
+Accept-Language: en-US,en;q=0.5
+Referer: https://localhost:9000/
+Sec-Fetch-Dest: empty
+Sec-Fetch-Mode: cors
+Sec-Fetch-Site: same-origin
+Te: trailers
+User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:97.0) Gecko/20100101 Firefox/97.0]
+
+<- RESPONSE
+
+No headers provided
+```
+
+Safari headers:
+```
+REQUEST ->
+
+Accept: */*
+Accept-Encoding: gzip, deflate, br
+Accept-Language: en-sg
+Referer: https://localhost:9000/
+User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.2 Safari/605.1.15
+
+<- RESPONSE
+
+Content-Encoding: gzip
+Content-Type: application/json
+Vary: Origin, Accept-Encoding
+Date: Sun, 13 Mar 2022 14:05:30 GMT
+```
+
+Edge headers:
+```
+REQUEST ->
+
+Accept: */*
+Accept-Encoding: gzip, deflate, br
+Accept-Language: en-GB,en;q=0.9,en-US;q=0.8
+Referer: https://localhost:9000/
+Sec-Ch-Ua: " Not A;Brand";v="99", "Chromium";v="99", "Microsoft Edge";v="99"
+Sec-Ch-Ua-Mobile: ?0
+Sec-Ch-Ua-Platform: "macOS"
+Sec-Fetch-Dest: empty
+Sec-Fetch-Mode: cors
+Sec-Fetch-Site: same-origin
+User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.4844.51 Safari/537.36 Edg/99.0.1150.39
+
+<- RESPONSE
+
+Content-Encoding: gzip
+Content-Type: application/json
+Date: Sun, 13 Mar 2022 14:06:11 GMT
+Vary: Origin
+Vary: Accept-Encoding
+```
+
+Go client headers:
+```
+REQUEST ->
+
+Accept-Encoding: gzip
+User-Agent: Go-http-client/1.1
+
+<- RESPONSE
+
+No headers provided
+```
 
 ## Reproduce
 To reproduce the issue:
