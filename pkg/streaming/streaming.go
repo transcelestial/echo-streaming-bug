@@ -43,6 +43,8 @@ func (s *httpStreamer) EchoHandler(p Params) echo.HandlerFunc {
 			}
 		}()
 
+		log.Debug("streaming: req headers", c.Request().Header)
+
 		var d time.Duration
 		params := requestParams{}
 		if err := c.Bind(&params); err != nil {

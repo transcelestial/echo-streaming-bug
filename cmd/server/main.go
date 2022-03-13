@@ -7,6 +7,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	log "github.com/sirupsen/logrus"
 	"github.com/transcelestial/echo-streaming-bug/pkg/streaming"
 )
 
@@ -23,6 +24,8 @@ func main() {
 	if *certPath == "" || *keyPath == "" {
 		e.Logger.Fatalf("-cert and -key flags are required")
 	}
+
+	log.SetLevel(log.DebugLevel)
 
 	e.Pre(middleware.HTTPSRedirect())
 	e.Pre(middleware.RemoveTrailingSlash())
