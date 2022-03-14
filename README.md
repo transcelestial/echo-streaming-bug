@@ -133,7 +133,12 @@ User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:97.0) Gecko/2010010
 
 <- RESPONSE
 
-No headers provided
+Content-Encoding: gzip
+Content-Type: application/json
+Date: Mon, 14 Mar 2022 01:48:25 GMT
+Vary: Origin
+Vary: Accept-Encoding
+X-Firefox-Spdy: h2
 ```
 
 #### Safari
