@@ -7,7 +7,9 @@ I have tested in the following envs/contexts:
 3. Run same as 1, but multiple clients (Go CLI + browsers) connected
 
 ## Reproduce
-To reproduce the issue:
+
+### Local
+To reproduce the issue on your local machine:
 1. Run the server:
 ```bash
 go run ./cmd/server/main.go -cert ./certs/cert.pem -key ./certs/key.pem
@@ -65,7 +67,8 @@ SyntaxError: Unexpected token { in JSON at position 119
     at streamData (<anonymous>:20:40)
 ```
 
-To test with echo-less proxy:
+### No Echo Proxy:
+To reproduce the issue on your local machine, but using the `net/http/httputil` directly to proxy:
 1. Run the server:
 ```bash
 go run ./cmd/server/main.go -cert ./certs/cert.pem -key ./certs/key.pem
@@ -74,9 +77,24 @@ go run ./cmd/server/main.go -cert ./certs/cert.pem -key ./certs/key.pem
 ```bash
 go run ./cmd/proxy-naked/main.go -cert ./certs/cert.pem -key ./certs/key.pem
 ```
-3. Open https://localhost:9001 and run the same JS code as above, but use the following URL:
+3. Run the same code as in the [local](#local) example, step 3, but different URL:
 ```js
-streamData("https://localhost:9001/ping?interval=100ms")
+streamData("https://localhost:9000/ping?interval=100ms")
+```
+
+### Docker:
+To reproduce the issue on your local machine, using the `net/http/httputil` directly to proxy and docker:
+1. Build the images:
+```bash
+docker-compose build
+```
+2. Run the services:
+```bash
+docker-compose up
+```
+3. Run the same code as in the [local](#local) example, step 3, but different URL:
+```js
+streamData("https://localhost:9000/ping?interval=100ms")
 ```
 
 ## Notes

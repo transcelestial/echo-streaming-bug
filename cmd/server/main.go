@@ -59,7 +59,7 @@ func main() {
 	})
 
 	s := &http.Server{
-		Addr:    ":8000",
+		Addr:    "0.0.0.0:8000",
 		Handler: e,
 		TLSConfig: &tls.Config{
 			MinVersion: tls.VersionTLS12,

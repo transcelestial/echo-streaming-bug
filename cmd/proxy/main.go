@@ -12,8 +12,9 @@ import (
 )
 
 var (
-	certPath = flag.String("cert", "", "SSL cert path")
-	keyPath  = flag.String("key", "", "SSL cert key path")
+	certPath  = flag.String("cert", "", "SSL cert path")
+	keyPath   = flag.String("key", "", "SSL cert key path")
+	serverURL = flag.String("server", "https://localhost:8000", "Upstream server URL")
 )
 
 func main() {
@@ -36,7 +37,7 @@ func main() {
 	}))
 	e.Use(middleware.Recover())
 
-	apiURL, err := url.Parse("https://localhost:8000")
+	apiURL, err := url.Parse(*serverURL)
 	if err != nil {
 		e.Logger.Fatal(err)
 	}
@@ -52,7 +53,6 @@ func main() {
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
 				InsecureSkipVerify: true,
-				ServerName:         "localhost",
 				MinVersion:         tls.VersionTLS12,
 			},
 		},
@@ -66,7 +66,7 @@ func main() {
 	})
 
 	s := &http.Server{
-		Addr:    ":9000",
+		Addr:    "0.0.0.0:9000",
 		Handler: e,
 		TLSConfig: &tls.Config{
 			MinVersion: tls.VersionTLS12,

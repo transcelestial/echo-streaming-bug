@@ -1,0 +1,16 @@
+version: "3.9"
+services:
+  proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile.proxy
+    ports:
+      - "9000:9000"
+    links:
+      - server
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    ports:
+      - "8000:8000"

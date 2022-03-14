@@ -1,0 +1,53 @@
+# syntax = docker/dockerfile:1.1-experimental
+# https://github.com/moby/buildkit/blob/master/frontend/dockerfile/docs/syntax.md
+# NOTE: `sudo` don't work here!
+
+# go mod stage
+FROM --platform=${BUILDPLATFORM} golang:1.17-alpine3.14 AS base
+
+RUN apk add --update --no-cache ca-certificates git
+
+WORKDIR /code
+COPY ./go.mod ./go.sum ./
+
+ENV GO111MODULE=on
+
+RUN --mount=type=cache,target=/go/pkg/mod \
+  go mod download
+
+# build stage
+FROM base AS builder
+
+ARG TARGETARCH
+ARG TARGETOS
+
+WORKDIR /code
+
+ENV GO111MODULE=on
+ENV GOARCH=$TARGETARCH
+ENV GOOS=$TARGETOS
+ENV BIN_DIR /tmp/bin
+
+WORKDIR /code
+COPY ./cmd ./cmd
+COPY ./pkg ./pkg
+
+RUN --mount=type=cache,target=/root/.cache/ \
+  --mount=type=cache,target=/go/pkg/mod,ro \
+  mkdir -p $BIN_DIR && \
+  go build -mod readonly -o $BIN_DIR/server ./cmd/server/.
+
+# run stage
+FROM alpine:3.14
+
+WORKDIR /code
+COPY --from=builder /tmp/bin .
+COPY ./certs .
+
+EXPOSE 8000
+
+CMD [ \
+  "./server", \
+  "-cert", "cert.pem", \
+  "-key", "key.pem" \
+  ]

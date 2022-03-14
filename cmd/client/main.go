@@ -38,7 +38,6 @@ func main() {
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
 				InsecureSkipVerify: true,
-				ServerName:         "localhost",
 				MinVersion:         tls.VersionTLS12,
 			},
 		},

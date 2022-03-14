@@ -10,8 +10,9 @@ import (
 )
 
 var (
-	certPath = flag.String("cert", "", "SSL cert path")
-	keyPath  = flag.String("key", "", "SSL cert key path")
+	certPath  = flag.String("cert", "", "SSL cert path")
+	keyPath   = flag.String("key", "", "SSL cert key path")
+	serverURL = flag.String("server", "https://localhost:8000", "Upstream server URL")
 )
 
 func main() {
@@ -21,7 +22,7 @@ func main() {
 		log.Fatalf("-cert and -key flags are required")
 	}
 
-	apiURL, err := url.Parse("https://localhost:8000")
+	apiURL, err := url.Parse(*serverURL)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -30,7 +31,6 @@ func main() {
 	proxy.Transport = &http.Transport{
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: true,
-			ServerName:         "localhost",
 			MinVersion:         tls.VersionTLS12,
 		},
 	}
@@ -42,7 +42,7 @@ func main() {
 	})
 
 	s := &http.Server{
-		Addr:    ":9001",
+		Addr:    "0.0.0.0:9000",
 		Handler: mux,
 		TLSConfig: &tls.Config{
 			MinVersion: tls.VersionTLS12,
