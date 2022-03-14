@@ -5,6 +5,7 @@ I have tested in the following envs/contexts:
 1. Run the server and proxy on a macOS 11.6.2 M1, with Go 1.16.4 and the client is Chrome 98.0/Firefox 97.0/Edge 99.0/Safari 15.2 (on the same macOS)
 2. Run the server and proxy (cross-compiled for Linux, ARM, w/ Go 1.16.4) on a Raspberry Pi 3 (CM3+), Debian 9, Linux 4.14.98 and the client is the same as above (SSH and proxy - with `ssh -L 9000:127.0.0.1:9000 <host IP>` - the proxy server port to the local macOS machine)
 3. Run same as 1, but multiple clients (Go CLI + browsers) connected
+4. Run same as 1, but no proxy, so just the server + the clients
 
 ## Reproduce
 
@@ -100,13 +101,20 @@ streamData("https://localhost:9000/ping?interval=100ms")
 ## Notes
 1. When running everything on the same host, it takes much longer to get the error
 2. When running the proxy and server remotely, it fails earlier, but still takes quite some time
-3. Chrome and Edge fail consistenly at ~ 1519s
-4. Firefox fails much earlier (15 minutes on average)
-5. In Firefox, when clearing the console (a few times) or when leaving the browser window, you get:
+3. I was able to get the same failures w/o using the proxy, so using just the server
+4. Chrome and Edge fail consistenly at ~ 1519s; this number seems to be lower when the JSON payload is higher
+5. Firefox fails much earlier (15 minutes on average)
+6. In Firefox, when clearing the console (a few times) or when leaving the browser window, you get:
 ```
 SyntaxError: JSON.parse: unexpected non-whitespace character after JSON data at line 2 column 1 of the JSON data
 ```
-6. I was unable to reproduce the error when running the Go [client](./cmd/client/). I ran it for about 2hrs and the error didn't occur.
+7. Firefox fails fast if the JSON payload is a little larger:
+```
+SyntaxError: JSON.parse: unterminated string at line 1 column 445 of the JSON data
+```
+8. Firefox fails when connecting directly to the API, not just the proxy, when streaming larger JSON payloads
+9. Chrome fails when going to fullscreen then back to normal
+10. I was unable to reproduce the error when running the Go [client](./cmd/client/). I ran it for about 2hrs and the error didn't occur.
 
 ### Req/Res Headers
 
