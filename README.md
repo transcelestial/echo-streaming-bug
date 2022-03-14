@@ -84,7 +84,7 @@ streamData("https://localhost:9001/ping?interval=100ms")
 2. When running the proxy and server remotely, it fails earlier, but still takes quite some time
 3. Chrome and Edge fail consistenly at ~ 1519s
 4. Firefox fails much earlier (15 minutes on average)
-5. In Firefox, when clearing the console (a few times), you get:
+5. In Firefox, when clearing the console (a few times) or when leaving the browser window, you get:
 ```
 SyntaxError: JSON.parse: unexpected non-whitespace character after JSON data at line 2 column 1 of the JSON data
 ```
