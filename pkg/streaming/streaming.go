@@ -3,6 +3,7 @@ package streaming
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"time"
@@ -16,136 +17,118 @@ func NewHTTPStreamer() HTTPStreamer {
 }
 
 type HTTPStreamer interface {
-	EchoHandler(Params) echo.HandlerFunc
+	EchoHandler(ReadCb) echo.HandlerFunc
+	HttpHandler(ReadCb) http.HandlerFunc
 }
+
+type ReadCb func() (interface{}, error)
 
 type httpStreamer struct{}
 
-// EchoHandler returns an echo streaming response handler.
-func (s *httpStreamer) EchoHandler(p Params) echo.HandlerFunc {
-	return func(c echo.Context) error {
-		ctx, cancel := context.WithCancel(c.Request().Context())
-		defer cancel()
+func (*httpStreamer) handleHttp(read ReadCb, w http.ResponseWriter, r *http.Request) (int, error) {
+	ctx, cancel := context.WithCancel(r.Context())
+	defer cancel()
 
-		data := make(chan interface{})
-		e := make(chan error)
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		err := errors.New("streaming: w does not implement the http.Flusher interface")
+		log.Error(err)
+		return http.StatusInternalServerError, err
+	}
 
-		// Drain the chans (not great, but ok)
+	data := make(chan interface{})
+	e := make(chan error)
+
+	// Drain the chans (not great, but ok)
+	defer func() {
+		log.Debug("streaming: draining chans")
+		select {
+		case <-data:
+		default:
+		}
+		select {
+		case <-e:
+		default:
+		}
+	}()
+
+	log.Debug("streaming: req headers", r.Header)
+
+	d, err := parseDuration(r.URL.Query().Get("interval"))
+	if err != nil {
+		return http.StatusBadRequest, err
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	flusher.Flush()
+
+	jsonLogger := log.New()
+	jsonLogger.SetLevel(log.GetLevel())
+	lw := jsonLogger.WriterLevel(log.DebugLevel)
+	defer lw.Close()
+
+	mw := io.MultiWriter(w, lw)
+	enc := json.NewEncoder(mw)
+
+	ticker := time.NewTicker(d)
+	defer ticker.Stop()
+
+	// Send data before starting the ticker
+	v, err := read()
+	if err != nil {
+		return http.StatusInternalServerError, err
+	}
+	if err := enc.Encode(v); err != nil {
+		return http.StatusInternalServerError, err
+	}
+	flusher.Flush()
+
+	go func(data chan<- interface{}, e chan<- error) {
+		// Sender must close the chans
 		defer func() {
-			log.Debug("streaming: draining chans")
-			select {
-			case <-data:
-			default:
-			}
-			select {
-			case <-e:
-			default:
-			}
+			log.Debug("streaming: close chans")
+			close(data)
+			close(e)
 		}()
-
-		log.Debug("streaming: req headers", c.Request().Header)
-
-		var d time.Duration
-		params := requestParams{}
-		if err := c.Bind(&params); err != nil {
-			return badReqErr(err)
-		} else if d, err = parseDuration(params.Interval); err != nil {
-			return badReqErr(err)
-		}
-
-		res := c.Response()
-		res.Header().Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
-		res.WriteHeader(http.StatusOK)
-
-		jsonLogger := log.New()
-		jsonLogger.SetLevel(log.GetLevel())
-		lw := jsonLogger.WriterLevel(log.DebugLevel)
-		defer lw.Close()
-
-		w := io.MultiWriter(res, lw)
-		enc := json.NewEncoder(w)
-
-		ticker := time.NewTicker(d)
-		defer ticker.Stop()
-
-		// Send data before starting the ticker
-		v, err := p.Read(c)
-		if err != nil {
-			return serverErr(err)
-		}
-		if err := enc.Encode(v); err != nil {
-			return serverErr(err)
-		}
-		res.Flush()
-
-		go func(data chan<- interface{}, e chan<- error) {
-			// Sender must close the chans
-			defer func() {
-				log.Debug("streaming: close chans")
-				close(data)
-				close(e)
-			}()
-
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case <-ticker.C:
-					v, err := p.Read(c)
-					if err != nil {
-						log.Errorf("streaming: read error: %s", err.Error())
-						e <- err
-						return
-					}
-					log.Tracef("streaming: send data: %v", v)
-					data <- v
-				}
-			}
-		}(data, e)
 
 		for {
 			select {
 			case <-ctx.Done():
-				log.Debug("streaming: request cancelled")
-				return nil
-			case err := <-e:
-				return serverErr(err)
-			case p := <-data:
-				if err := enc.Encode(p); err != nil {
-					log.Errorf("streaming: encode error: %s", err.Error())
-					return serverErr(err)
+				return
+			case <-ticker.C:
+				v, err := read()
+				if err != nil {
+					log.Errorf("streaming: read error: %s", err.Error())
+					e <- err
+					return
 				}
-				res.Flush()
+				log.Tracef("streaming: send data: %v", v)
+				data <- v
 			}
+		}
+	}(data, e)
+
+	for {
+		select {
+		case <-ctx.Done():
+			log.Debug("streaming: request cancelled")
+			return http.StatusOK, nil
+		case err := <-e:
+			return http.StatusInternalServerError, err
+		case p := <-data:
+			if err := enc.Encode(p); err != nil {
+				log.Errorf("streaming: encode error: %s", err.Error())
+				return http.StatusInternalServerError, err
+			}
+			flusher.Flush()
 		}
 	}
 }
 
-type Params struct {
-	// Read is the cb which provides the data to the stream and
-	// it's invoked on every tick.
-	Read ReadHandler
-}
-
-type ReadHandler func(c echo.Context) (interface{}, error)
-
-type requestParams struct {
-	Interval string `query:"interval"`
-}
-
-func parseDuration(s string) (d time.Duration, err error) {
+func parseDuration(s string) (time.Duration, error) {
 	if s == "" {
-		d = time.Second
-		return
+		return time.Second, nil
 	}
-	d, err = time.ParseDuration(s)
-	return
-}
-
-func serverErr(err error) error {
-	return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
-}
-
-func badReqErr(err error) error {
-	return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	return time.ParseDuration(s)
 }

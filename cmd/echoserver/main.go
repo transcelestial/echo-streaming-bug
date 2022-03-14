@@ -8,6 +8,8 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	log "github.com/sirupsen/logrus"
+
+	"github.com/transcelestial/echo-streaming-bug/pkg/datasource"
 	"github.com/transcelestial/echo-streaming-bug/pkg/streaming"
 )
 
@@ -36,21 +38,7 @@ func main() {
 
 	streamer := streaming.NewHTTPStreamer()
 
-	pongH := streamer.EchoHandler(streaming.Params{
-		Read: func(c echo.Context) (interface{}, error) {
-			return struct {
-				Pong   bool   `json:"pong"`
-				Reason string `json:"reason"`
-				Date   string `json:"date"`
-				Quote  string `json:"quote"`
-			}{
-				true,
-				"the bug does not seem to be here :( where is it then?",
-				"2022-03-12T11:34:26.722022402Z",
-				"dumbass!",
-			}, nil
-		},
-	})
+	pongH := streamer.EchoHandler(datasource.Data)
 
 	e.GET("/ping", pongH)
 

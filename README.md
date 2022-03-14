@@ -6,18 +6,20 @@ I have tested in the following envs/contexts:
 2. Run the server and proxy (cross-compiled for Linux, ARM, w/ Go 1.16.4) on a Raspberry Pi 3 (CM3+), Debian 9, Linux 4.14.98 and the client is the same as above (SSH and proxy - with `ssh -L 9000:127.0.0.1:9000 <host IP>` - the proxy server port to the local macOS machine)
 3. Run same as 1, but multiple clients (Go CLI + browsers) connected
 4. Run same as 1, but no proxy, so just the server + the clients
+5. Run same as 1, but non-echo server and proxy
 
 ## Reproduce
 
-### Local
-To reproduce the issue on your local machine:
-1. Run the server:
+### Echo + Echo Proxy
+To reproduce the issue on your local machine using the echo server and proxy:
+
+1. Run the echo server:
 ```bash
-go run ./cmd/server/main.go -cert ./certs/cert.pem -key ./certs/key.pem
+go run ./cmd/echoserver/main.go -cert ./certs/cert.pem -key ./certs/key.pem
 ```
-2. Run the proxy:
+2. Run the echo proxy:
 ```bash
-go run ./cmd/proxy/main.go -cert ./certs/cert.pem -key ./certs/key.pem
+go run ./cmd/echoproxy/main.go -cert ./certs/cert.pem -key ./certs/key.pem
 ```
 3. Open https://localhost:9000 and run the following in the debugger console:
 ```js
@@ -68,23 +70,37 @@ SyntaxError: Unexpected token { in JSON at position 119
     at streamData (<anonymous>:20:40)
 ```
 
-### No Echo Proxy:
-To reproduce the issue on your local machine, but using the `net/http/httputil` directly to proxy:
-1. Run the server:
+### Echo + HTTP Proxy:
+To reproduce the issue on your local machine using the echo server and the `net/http/httputil` proxy:
+
+1. Run the echo server:
 ```bash
-go run ./cmd/server/main.go -cert ./certs/cert.pem -key ./certs/key.pem
+go run ./cmd/echoserver/main.go -cert ./certs/cert.pem -key ./certs/key.pem
 ```
-2. Run the proxy-naked:
+2. Run the HTTP proxy:
 ```bash
-go run ./cmd/proxy-naked/main.go -cert ./certs/cert.pem -key ./certs/key.pem
+go run ./cmd/httpproxy/main.go -cert ./certs/cert.pem -key ./certs/key.pem
 ```
-3. Run the same code as in the [local](#local) example, step 3, but different URL:
+3. Run the same code as in the [Echo + Echo Proxy](#echo-+-echo-proxy) example, step 3, but different URL (so you just need the `streamData` func):
 ```js
 streamData("https://localhost:9000/ping?interval=100ms")
 ```
 
-### Docker:
-To reproduce the issue on your local machine, using the `net/http/httputil` directly to proxy and docker:
+### HTTP Server + HTTP Proxy:
+To reproduce the issue on your local machine using the `net/http` server and the `net/http/httputil` proxy:
+
+1. Run the HTTP server:
+```bash
+go run ./cmd/httpserver/main.go -cert ./certs/cert.pem -key ./certs/key.pem
+```
+2. Run the HTTP proxy:
+```bash
+go run ./cmd/httpproxy/main.go -cert ./certs/cert.pem -key ./certs/key.pem
+```
+3. Run the same code as in the [Echo + HTTP Proxy](#echo-+-http-proxy) example, step 3:
+
+### Echo + Echo Proxy in Docker:
+To reproduce the issue on your local machine using the echo server and proxy with Docker:
 1. Build the images:
 ```bash
 docker-compose build
@@ -93,28 +109,24 @@ docker-compose build
 ```bash
 docker-compose up
 ```
-3. Run the same code as in the [local](#local) example, step 3, but different URL:
-```js
-streamData("https://localhost:9000/ping?interval=100ms")
-```
+3. Run the same code as in the [Echo + Echo Proxy](#echo-+-echo-proxy) example, step 3
 
 ## Notes
 1. When running everything on the same host, it takes much longer to get the error
 2. When running the proxy and server remotely, it fails earlier, but still takes quite some time
-3. I was able to get the same failures w/o using the proxy, so using just the server
+3. I was able to get the same failures w/o using the proxy, so using just the server(s) - either echo or non-echo
 4. Chrome and Edge fail consistenly at ~ 1519s; this number seems to be lower when the JSON payload is higher
 5. Firefox fails much earlier (15 minutes on average)
 6. In Firefox, when clearing the console (a few times) or when leaving the browser window, you get:
 ```
 SyntaxError: JSON.parse: unexpected non-whitespace character after JSON data at line 2 column 1 of the JSON data
 ```
-7. Firefox fails fast if the JSON payload is a little larger:
+7. Firefox fails fast if the JSON payload is a little larger (sometimes with the error described above):
 ```
 SyntaxError: JSON.parse: unterminated string at line 1 column 445 of the JSON data
 ```
-8. Firefox fails when connecting directly to the API, not just the proxy, when streaming larger JSON payloads
-9. Chrome fails when going to fullscreen then back to normal
-10. I was unable to reproduce the error when running the Go [client](./cmd/client/). I ran it for about 2hrs and the error didn't occur.
+8. Chrome, Firefox and Edge fail when going to fullscreen then back to normal
+9. I was unable to reproduce the error when running the Go [client](./cmd/client/). I ran it for about 2hrs and the error didn't occur.
 
 ### Req/Res Headers
 
