@@ -8,6 +8,11 @@ I have tested in the following envs/contexts:
 4. Run same as 1, but no proxy, so just the server + the clients
 5. Run same as 1, but non-echo server and proxy
 
+Issue reported at:
+1. https://github.com/labstack/echo/issues/2125
+2. https://github.com/golang/go/issues/51646
+3. https://bugs.chromium.org/p/chromium/issues/detail?id=1305928
+
 ## Reproduce
 
 ### Echo + Echo Proxy
@@ -111,7 +116,7 @@ docker-compose up
 ```
 3. Run the same code as in the [Echo + Echo Proxy](#echo-+-echo-proxy) example, step 3
 
-## Notes
+## Symptoms
 1. When running everything on the same host, it takes much longer to get the error
 2. When running the proxy and server remotely, it fails earlier, but still takes quite some time
 3. I was able to get the same failures w/o using the proxy, so using just the server(s) - either echo or non-echo
@@ -232,6 +237,91 @@ User-Agent: Go-http-client/1.1
 <- RESPONSE
 
 No headers provided
+```
+
+## Fix
+After some investigation and help from [@seankhliao](https://github.com/seankhliao), the fix was as simple as making sure to only parse the data to JSON after line endings (because the stream can be chunked arbitrarily):
+```js
+streamData("https://localhost:9000/ping?interval=100ms")
+
+async function streamData(url) {
+    const res = await fetch(url);
+
+    if (!res.ok) {
+        throw `got response w/ status code: ${res.status}`;
+    }
+    
+    const reader = res.body.getReader();
+    const t0 = window.performance.now();
+
+    try {
+        for await (const line of readLineByLine(reader)) {
+          const json = await toJSON(line)
+          console.info('Got data', json);
+        }
+        
+        const t1 = window.performance.now();
+        const duration = (t1 - t0)/1000;
+
+        console.info(`Stream ended after ${duration}s`);
+    } catch (e) {
+        const t1 = window.performance.now();
+        const duration = (t1 - t0)/1000;
+        if (e.name === 'AbortError') {
+          console.info(`Stream aborted after ${duration}s`);
+        } else {
+            console.info(`Stream errored after ${duration}s`);
+            console.error(e);
+        }
+    }
+
+    reader.cancel();
+}
+
+async function* readLineByLine(reader) {
+    const utf8Decoder = new TextDecoder("utf-8");
+    let {value: chunk, done: readerDone} = await reader.read();
+    chunk = chunk ? utf8Decoder.decode(chunk, {stream: true}) : "";
+
+    const re = /\r\n|\n|\r/gm;
+    let startIndex = 0;
+
+    for (; ;) {
+        const result = re.exec(chunk);
+        if (!result) {
+            if (readerDone) {
+                break;
+            }
+
+            const remainder = chunk.substr(startIndex);
+
+            ({value: chunk, done: readerDone} = await reader.read());
+            chunk = remainder + (chunk ? utf8Decoder.decode(chunk, {stream: true}) : "");
+            startIndex = re.lastIndex = 0;
+
+            continue;
+        }
+
+        yield chunk.substring(startIndex, result.index);
+
+        startIndex = re.lastIndex;
+    }
+
+    if (startIndex < chunk.length) {
+        // last line didn't end in a newline char
+        yield chunk.substr(startIndex);
+    }
+}
+
+async function toJSON(value) {
+    try {
+        const res = new Response(value);
+        const data = await res.json();
+        return data;
+    } catch (e) {
+        throw e;
+    }
+}
 ```
 
 ## Guides
